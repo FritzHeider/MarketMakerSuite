@@ -1,106 +1,132 @@
 # path: trading_bot/system_architecture.py
+from abc import ABC, abstractmethod
 import asyncio
-import logging
-from typing import Tuple, Dict
+from typing import Dict, Tuple, Optional
 
 
-class DataFeedComponent:
-    def __init__(self, api_url: str, api_key: str):
-        self.api_url = api_url
-        self.api_key = api_key
-        self.current_price = None
+# Abstract Interfaces
+class DataFeedInterface(ABC):
+    """Abstract base class for data feed modules."""
 
+    @abstractmethod
     async def connect(self) -> None:
-        """Logic to connect to the API."""
-        try:
-            # Simulate connection setup
-            await asyncio.sleep(1)
-            print("Connected to API")
-        except Exception as e:
-            print(f"Error connecting to API: {e}")
+        """Connect to the data source."""
+        pass
 
+    @abstractmethod
     async def update_price(self) -> None:
         """Fetch and update the latest market price."""
+        pass
+
+    @abstractmethod
+    def get_current_price(self) -> float:
+        """Get the current market price."""
+        pass
+
+
+class OrderManagementInterface(ABC):
+    """Abstract base class for order management modules."""
+
+    @abstractmethod
+    async def place_order(self, price: float, quantity: float, order_type: str) -> str:
+        """Place an order."""
+        pass
+
+    @abstractmethod
+    async def cancel_order(self, order_id: str) -> bool:
+        """Cancel an order."""
+        pass
+
+    @abstractmethod
+    def get_order_status(self, order_id: str) -> Dict:
+        """Get the status of an order."""
+        pass
+
+
+# Concrete Implementation of DataFeedModule
+class DataFeedModule(DataFeedInterface):
+    def __init__(self, api_url: str, api_key: str, logger=None):
+        self.api_url = api_url
+        self.api_key = api_key
+        self.current_price: Optional[float] = None
+        self.logger = logger or self._default_logger()
+
+    async def connect(self) -> None:
         try:
-            # Simulate fetching data
-            await asyncio.sleep(1)
-            self.current_price = 100.0  # Replace with actual API call
-            print(f"Market price updated: {self.current_price}")
+            await asyncio.sleep(1)  # Simulate connection
+            self.logger.info("Connected to the Market Data API.")
         except Exception as e:
-            print(f"Error updating market price: {e}")
+            self.logger.error(f"Error connecting to API: {e}")
+
+    async def update_price(self) -> None:
+        try:
+            await asyncio.sleep(1)  # Simulate data fetch
+            self.current_price = 100.0  # Replace with real API data
+            self.logger.info(f"Market price updated: {self.current_price}")
+        except Exception as e:
+            self.logger.error(f"Error updating market price: {e}")
 
     def get_current_price(self) -> float:
-        """Return the current market price."""
         if self.current_price is None:
             raise ValueError("Market price not available yet.")
         return self.current_price
 
-
-class OrderManagementSystem:
-    def __init__(self):
-        self.orders: Dict[str, Dict] = {}
-
-    async def place_order(self, price: float, quantity: float, order_type: str) -> str:
-        """Send an order to the exchange."""
-        try:
-            order_id = f"order_{len(self.orders) + 1}"
-            self.orders[order_id] = {"price": price, "quantity": quantity, "type": order_type, "status": "placed"}
-            await asyncio.sleep(0.5)  # Simulate API call
-            print(f"Order placed: {order_id}")
-            return order_id
-        except Exception as e:
-            print(f"Error placing order: {e}")
-
-    async def cancel_order(self, order_id: str) -> None:
-        """Cancel a specific order."""
-        if order_id in self.orders:
-            self.orders[order_id]["status"] = "cancelled"
-            await asyncio.sleep(0.5)  # Simulate API call
-            print(f"Order cancelled: {order_id}")
-        else:
-            print(f"Order ID {order_id} not found.")
-
-    def get_order_status(self, order_id: str) -> Dict:
-        """Return the status of a specific order."""
-        return self.orders.get(order_id, {"status": "not found"})
-
-
-class PricingStrategyModule:
-    def __init__(self, spread: float):
-        self.spread = spread
-
-    def calculate_bid_ask(self, market_price: float) -> Tuple[float, float]:
-        """Calculate bid and ask prices based on the market price and spread."""
-        bid_price = market_price - self.spread
-        ask_price = market_price + self.spread
-        return bid_price, ask_price
-
-
-class RiskManagementModule:
-    def __init__(self, max_order_size: float, stop_loss_threshold: float):
-        self.max_order_size = max_order_size
-        self.stop_loss_threshold = stop_loss_threshold
-
-    def assess_order_risk(self, price: float, quantity: float) -> bool:
-        """Assess if the order exceeds risk thresholds."""
-        if quantity > self.max_order_size:
-            print(f"Order rejected: Exceeds max order size ({self.max_order_size})")
-            return False
-        return True
-
-
-class LoggingMonitoringSystem:
-    def __init__(self):
-        self.logger = logging.getLogger("TradingBot")
-        self.logger.setLevel(logging.INFO)
+    @staticmethod
+    def _default_logger():
+        import logging
+        logger = logging.getLogger("DataFeedModule")
+        logger.setLevel(logging.INFO)
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-        self.logger.addHandler(handler)
+        logger.addHandler(handler)
+        return logger
 
-    def log_event(self, message: str) -> None:
-        """Log an informational event."""
-        self.logger.info(message)
 
-    def log_error(self, message: str) -> None:
-        """Log an error event."""
-        self.logger.error(message)
+# Concrete Implementation of OrderManagementModule
+class OrderManagementModule(OrderManagementInterface):
+    def __init__(self, logger=None):
+        self.orders: Dict[str, Dict] = {}
+        self.logger = logger or self._default_logger()
+
+    async def place_order(self, price: float, quantity: float, order_type: str) -> str:
+        try:
+            order_id = f"order_{len(self.orders) + 1}"
+            self.orders[order_id] = {
+                "price": price,
+                "quantity": quantity,
+                "type": order_type,
+                "status": "placed"
+            }
+            await asyncio.sleep(0.5)  # Simulate order placement
+            self.logger.info(f"Order placed: {order_id}")
+            return order_id
+        except Exception as e:
+            self.logger.error(f"Error placing order: {e}")
+            raise
+
+    async def cancel_order(self, order_id: str) -> bool:
+        try:
+            if order_id in self.orders:
+                self.orders[order_id]["status"] = "cancelled"
+                await asyncio.sleep(0.5)  # Simulate API call
+                self.logger.info(f"Order cancelled: {order_id}")
+                return True
+            else:
+                self.logger.warning(f"Order ID {order_id} not found.")
+                return False
+        except Exception as e:
+            self.logger.error(f"Error cancelling order: {e}")
+            raise
+
+    def get_order_status(self, order_id: str) -> Dict:
+        return self.orders.get(order_id, {"status": "not found"})
+
+    @staticmethod
+    def _default_logger():
+        import logging
+        logger = logging.getLogger("OrderManagementModule")
+        logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        logger.addHandler(handler)
+        return logger
